@@ -1,0 +1,23 @@
+{
+  "short_name": "AgroCare",
+  "name": "AgroCare AI - Smart Farmer Companion",
+  "description": "Offline-capable AI Diagnosis, Mandi Rates, and Crop Health Management for Farmers",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#F8F9FA",
+  "theme_color": "#1B5E20",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "categories": [
+    "productivity",
+    "utilities",
+    "agriculture"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "AgroCare AI Final APP",
+  "description": "Smart farming assistant for crop diagnosis, market prices, and community advice.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

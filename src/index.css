@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@theme {
+  --font-sans: "Nunito", ui-sans-serif, system-ui, sans-serif;
+  --font-roboto: "Roboto", sans-serif;
+  
+  --color-primary: #2E7D32;
+  --color-primary-dark: #1B5E20;
+  --color-earth: #3E2723;
+  --color-soil: #F8F9FA;
+}
+
+@layer base {
+  body {
+    @apply bg-slate-200 text-gray-900 font-sans antialiased;
+    min-height: 100dvh;
+  }
+}
+
+@layer utilities {
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .filter-pills-container {
+    scroll-behavior: smooth;
+    scroll-snap-type: x mandatory;
+  }
+  .filter-pills-container > * {
+    scroll-snap-align: start;
+  }
+
+  /* Official Shop Styling for Featured/First Elements */
+  @keyframes officialPulseScale {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.02);
+    }
+  }
+
+  .animate-official-pulse {
+    animation: officialPulseScale 2.8s ease-in-out infinite;
+  }
+
+  div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div#supplier-map:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(4) > div:nth-of-type(1) {
+    @apply border-amber-300 ring-4 ring-amber-400/10 bg-gradient-to-br from-white to-amber-50/30;
+    animation: officialPulseScale 2.8s ease-in-out infinite;
+    box-shadow: 0 20px 40px -20px rgba(217, 119, 6, 0.15), 0 0 0 1px rgba(217, 119, 6, 0.08);
+  }
+}
