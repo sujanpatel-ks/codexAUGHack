@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Mic, MicOff, X, Loader2, Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DiagnosisResult } from '../services/gemini';
+import { OpenAIRealtimeVoice } from './OpenAIRealtimeVoice';
 
 interface LiveAudioChatProps {
   diagnosis: DiagnosisResult | null;
@@ -10,7 +11,7 @@ interface LiveAudioChatProps {
   onListeningChange?: (isListening: boolean) => void;
 }
 
-export const LiveAudioChat: React.FC<LiveAudioChatProps> = ({ diagnosis, onClose, onListeningChange }) => {
+const GeminiLiveAudioChat: React.FC<LiveAudioChatProps> = ({ diagnosis, onClose, onListeningChange }) => {
   const [isConnecting, setIsConnecting] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -336,4 +337,18 @@ export const LiveAudioChat: React.FC<LiveAudioChatProps> = ({ diagnosis, onClose
       </motion.div>
     </div>
   );
+};
+
+/**
+ * Prefer the OpenAI WebRTC agent, but retain the proven Gemini Live path so a
+ * farmer is never left without voice assistance when the realtime provider is unavailable.
+ */
+export const LiveAudioChat: React.FC<LiveAudioChatProps> = (props) => {
+  const [useGeminiFallback, setUseGeminiFallback] = useState(false);
+
+  if (useGeminiFallback) {
+    return <GeminiLiveAudioChat {...props} />;
+  }
+
+  return <OpenAIRealtimeVoice {...props} onFallback={() => setUseGeminiFallback(true)} />;
 };

@@ -50,9 +50,10 @@ AgroCare AI introduces an inclusive, multimodal ecosystem designed for resilienc
 * **Multimodal Leaf Pathology**: Snap or upload photos of diseased crop leaves. The application uses specialized multimodal vision prompts to perform an on-screen leaf quality audit before confirming any diagnosis.
 * **Granular Action Plans**: Receives a confidence score, bounding boxes for infected tissue, specific symptom match percentages, and structured treatment guidelines divided into **Organic** and **Chemical** methodologies (including dosage, estimated costs, and crop recovery advice).
 
-### 🎙️ 2. Real-Time Gemini Live Voice Chat (`LiveAudioChat`)
-* **Bidirectional Voice Streaming**: Rather than waiting for text generations, farmers can enter a live, hands-free voice call with **AgroCare Bot**.
-* **PCM 16kHz Streaming**: Converts microphone capture to raw 16-bit PCM chunks and streams them via WebSockets directly to `gemini-3.1-flash-live-preview`, resulting in real-time, bidirectional voice chat using the premium "Zephyr" voice model.
+### 🎙️ 2. Real-Time Voice Agent (`LiveAudioChat`)
+* **OpenAI WebRTC Voice Agent**: Farmers can have a low-latency, bidirectional conversation with AgroCare Voice through a server-authenticated `gpt-realtime` WebRTC call. The browser never receives the OpenAI API key.
+* **Actionable Tool Use**: The agent can call backend weather safety, diagnosis-context, ITK knowledge, supplier, and scheme-directory tools. Tool activity appears only when a real tool call occurs.
+* **Resilient Fallback**: If OpenAI Realtime is unavailable, the existing Gemini Live WebSocket voice path starts automatically so farmers can continue speaking to AgroCare.
 
 ### 📈 3. Mandi Price Arbitrage Analyzer
 * **Government Market API Proxy**: Fetches real-time, daily commodity rates directly from Indian mandi networks (data.gov.in), prioritizing Karnataka (Tumkur) with automated national fallback buffers.
@@ -99,7 +100,7 @@ AgroCare AI introduces an inclusive, multimodal ecosystem designed for resilienc
 | **Animations**| Framer Motion (`motion/react`) | Smooth fluid transitions, tactile button interactions, live audio ripples. |
 | **Backend** | Node.js, Express, `ws` (WebSockets) | Static asset distribution, secure API proxies, high-concurrency audio routing. |
 | **Database** | Cloud Firestore, Firebase Auth, `better-sqlite3` | Unified session management, secure profile writing, localized file stores. |
-| **AI Processing**| Google Gen AI SDK (`@google/genai`) | Unified developer interface utilizing modern SDK routing structures. |
+| **AI Processing**| OpenAI Realtime API + Google Gen AI SDK (`@google/genai`) | Server-authenticated WebRTC voice agent, plus Gemini vision, TTS, grounding, and voice fallback. |
 | **APIs Used** | Geolocation API, Web Audio API, Web Speech API | Captures coordinates, records raw microphone PCM, decodes sound buffers. |
 
 ---
@@ -115,6 +116,10 @@ AgroCare AI introduces an inclusive, multimodal ecosystem designed for resilienc
    * Initiates bidirectional, low-latency WebSocket connections via Express. Streams farmer voice commands directly to the live auditory model and receives back raw audio responses in the "Zephyr" voice.
 3. **`gemini-2.5-flash-preview-tts` (Accessible Text-to-Speech)**:
    * Decodes diagnostic text into rich synthesized spoken audio to support farmers with varying reading comprehension skills.
+
+### 🟢 OpenAI Realtime Voice
+* **`gpt-realtime` (Primary Voice Agent)**: The server exchanges the browser's WebRTC SDP offer with OpenAI and returns only the SDP answer. `OPENAI_API_KEY` stays server-side.
+* **Tool guardrails**: Weather safety is evaluated deterministically by the AgroCare backend; the model cannot override an unsafe or unknown spray recommendation.
 
 ### 🟢 Firebase Integration
 * **Firebase Authentication**: Implements secure user creation and profile state tracking.
@@ -185,6 +190,7 @@ AgroCare AI introduces an inclusive, multimodal ecosystem designed for resilienc
 - **Node.js** v18 or newer
 - **npm** (comes with Node)
 - **Google Gemini API Key** (Get one from [Google AI Studio](https://aistudio.google.com/))
+- **OpenAI API Key** for the primary realtime voice agent (Gemini Live remains the fallback)
 - **Firebase Project Credentials** (Optional, falls back safely to in-memory databases if unconfigured)
 
 ### Step 1: Clone the Repository
@@ -203,6 +209,10 @@ Create a `.env` file in the root directory:
 ```env
 # Google Gemini API key (Required for server-side processing)
 GEMINI_API_KEY=your_gemini_api_key_here
+
+# OpenAI Realtime key (server-side only; never use a VITE_ prefix)
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_REALTIME_MODEL=gpt-realtime
 
 # Government Mandi Price API key (Optional fallback key included)
 VITE_DATA_GOV_IN_API_KEY=your_government_data_api_key
@@ -249,7 +259,8 @@ agrocare-ai/
 │   ├── index.css              # Global styles & Tailwind CSS imports
 │   ├── components/            # Interactive UI Components
 │   │   ├── CameraDiagnosis.tsx   # Leaf photography controller
-│   │   ├── LiveAudioChat.tsx     # Gemini Live bidirectional PCM recorder
+│   │   ├── LiveAudioChat.tsx     # OpenAI voice-agent wrapper with Gemini fallback
+│   │   ├── OpenAIRealtimeVoice.tsx # WebRTC audio + realtime tool-call bridge
 │   │   ├── ArbitrageAnalyzer.tsx # Localized mandi distance & profit calculator
 │   │   ├── Market.tsx            # Mandi price list and API loader
 │   │   ├── WeatherForecast.tsx   # Google Search weather advisory cards
@@ -321,3 +332,4 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 * **Indian Council of Agricultural Research (ICAR)** for curate and open-sourcing the invaluable Indigenous Technical Knowledge (ITK) database.
 * **Ministry of Electronics & Information Technology (MeitY)** for exposing Indian mandi price indices via data.gov.in.
 * **The Google Gemini Team** for publishing the ultra-low latency Gemini Live WebSockets API, enabling the next generation of voice-based accessibility.
+* **OpenAI** for the Realtime API powering AgroCare Voice's WebRTC agent and tool-calling flow.

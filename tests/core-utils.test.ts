@@ -16,6 +16,7 @@ import {
   getDiagnosisConfidencePercent,
   isDiagnosisUnavailable,
 } from '../src/utils/diagnosisDisplay';
+import { evaluateSpraySafety, isValidCoordinate } from '../src/utils/voiceSafety';
 
 beforeEach(() => {
   const values = new Map<string, string>();
@@ -132,5 +133,18 @@ test('profile sanitization rejects privilege fields', () => {
   assert.deepEqual(profile, { name: 'Farmer One', crops: 'Tomato' });
   assert.equal(containsPrivilegedUserFields({ role: 'admin' }), true);
   assert.equal(containsPrivilegedUserFields({ name: 'Farmer One' }), false);
+});
+
+test('voice spray safety is deterministic for rain, wind, and unknown weather', () => {
+  assert.equal(evaluateSpraySafety({ rain: 0, wind: 12, precipitationProbability: 10 }).status, 'safe');
+  assert.equal(evaluateSpraySafety({ rain: 0.2, wind: 8, precipitationProbability: 5 }).status, 'unsafe');
+  assert.equal(evaluateSpraySafety({ rain: 0, wind: 24, precipitationProbability: 0 }).status, 'unsafe');
+  assert.equal(evaluateSpraySafety(null).status, 'unknown');
+});
+
+test('voice tools reject invalid location coordinates', () => {
+  assert.equal(isValidCoordinate(12.9716, -90, 90), true);
+  assert.equal(isValidCoordinate(200, -90, 90), false);
+  assert.equal(isValidCoordinate('12.9716', -90, 90), false);
 });
 

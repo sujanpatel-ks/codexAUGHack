@@ -8,12 +8,14 @@ import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { createServer } from "http";
 import { WebSocketServer } from "ws";
 import { ITK_KNOWLEDGE } from "./src/data/itk-knowledge";
+import { evaluateSpraySafety, isValidCoordinate } from "./src/utils/voiceSafety";
 import {
   containsPrivilegedUserFields,
   createUnableToDiagnoseResult,
   sanitizeDiagnosisRecord,
   sanitizeProfileInput,
 } from "./src/utils/apiSafety";
+import { runAgroCareAgent } from "./src/server/agentHarness";
 
 dotenv.config();
 
@@ -31,6 +33,97 @@ type AuthenticatedRequest = Request & {
 const isProduction = process.env.NODE_ENV === "production";
 const allowLocalDevAuthBypass = !isProduction && process.env.ALLOW_UNAUTHENTICATED_DEV_AUTH !== "false";
 const DEMO_AUTH_TOKEN = process.env.DEMO_AUTH_TOKEN || "agrocare-demo-token";
+const OPENAI_REALTIME_MODEL = process.env.OPENAI_REALTIME_MODEL || "gpt-realtime";
+
+const AGROCARE_VOICE_INSTRUCTIONS = `You are AgroCare Voice, the voice assistant for AgroCare AI.
+
+You are an agricultural decision-support assistant, not a replacement for a qualified agricultural expert. Speak naturally, briefly, and respectfully. Ask one important clarification question at a time. Do not invent agricultural facts or claim a tool was used unless you actually received its result.
+
+Use tools for current weather, local suppliers, government schemes, traditional agricultural knowledge, and diagnosis context. Before discussing a weather-sensitive chemical treatment, call get_weather when a location is available and follow its spraySafety result exactly. If evidence is insufficient, confidence is low, or a decision is high-risk, recommend local agricultural expert review. Never claim you diagnosed an image unless get_crop_diagnosis returns a confirmed diagnosis. Use simple conversational Kannada when the farmer speaks Kannada.`;
+
+const VOICE_TOOLS = [
+  {
+    type: "function",
+    name: "get_weather",
+    description: "Get current weather and the backend-enforced spray safety decision for a farm location.",
+    parameters: {
+      type: "object",
+      properties: { latitude: { type: "number" }, longitude: { type: "number" } },
+      required: ["latitude", "longitude"],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
+    name: "search_itk",
+    description: "Search AgroCare's Indigenous Technical Knowledge library for non-current agricultural guidance.",
+    parameters: {
+      type: "object",
+      properties: { query: { type: "string" } },
+      required: ["query"],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
+    name: "get_crop_diagnosis",
+    description: "Read the farmer's current AgroCare image-diagnosis context, if a confirmed result exists.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    type: "function",
+    name: "find_supplier",
+    description: "Find nearby agricultural input suppliers for a specified farm location.",
+    parameters: {
+      type: "object",
+      properties: { latitude: { type: "number" }, longitude: { type: "number" } },
+      required: ["latitude", "longitude"],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
+    name: "check_scheme",
+    description: "Check AgroCare's current scheme directory for possible government-support matches. Results require official verification.",
+    parameters: {
+      type: "object",
+      properties: {
+        state: { type: "string" },
+        farmerType: { type: "string", enum: ["Small", "Marginal", "Large", "All"] },
+        landSize: { type: "number" },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+  },
+];
+
+function readVoiceDiagnosisContext(input: unknown) {
+  if (!input || typeof input !== "object") return { available: false, message: "No current diagnosis is available." };
+  const raw = input as Record<string, unknown>;
+  const clean = (value: unknown, max = 100) => typeof value === "string" ? value.replace(/[\r\n]+/g, " ").trim().slice(0, max) : "";
+  const crop = clean(raw.crop);
+  const disease = clean(raw.disease);
+  const severity = clean(raw.severity, 30);
+  const confidence = typeof raw.confidence === "number" && Number.isFinite(raw.confidence)
+    ? Math.max(0, Math.min(100, raw.confidence))
+    : 0;
+  const unavailable = raw.diagnosisStatus === "UNAVAILABLE" || !crop || !disease || disease.toLowerCase() === "unable to diagnose";
+  if (unavailable) return { available: false, message: "No confirmed diagnosis is available. Ask the farmer for clear symptoms or recommend another clear leaf photo." };
+  return { available: true, crop, disease, severity: severity || "Unknown", confidence };
+}
+
+function getItkMatches(query: string) {
+  const terms = query.toLowerCase().split(/[^a-z0-9]+/).filter((term) => term.length > 2).slice(0, 8);
+  const entries = ITK_KNOWLEDGE.split("\n").map((line) => line.trim()).filter((line) => line.startsWith("-"));
+  const matches = entries
+    .map((entry) => ({ entry: entry.slice(1).trim(), score: terms.reduce((total, term) => total + (entry.toLowerCase().includes(term) ? 1 : 0), 0) }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map((item) => item.entry);
+  return matches;
+}
 
 function getBearerToken(req: Request) {
   const authHeader = req.header("authorization") || "";
@@ -222,6 +315,101 @@ async function startServer() {
       }
     });
   };
+
+  // --- OPENAI REALTIME VOICE AGENT ---
+  // The browser sends only its WebRTC SDP offer. OPENAI_API_KEY never leaves this server.
+  app.post("/api/voice/session", requireFirebaseUser, async (req: AuthenticatedRequest, res) => {
+    const sdp = typeof req.body?.sdp === "string" ? req.body.sdp : "";
+    const diagnosis = readVoiceDiagnosisContext(req.body?.diagnosis);
+    const apiKey = process.env.OPENAI_API_KEY;
+
+    if (!apiKey) return res.status(503).json({ error: "OpenAI voice is not configured" });
+    if (!sdp || sdp.length > 100_000 || !sdp.includes("v=0")) {
+      return res.status(400).json({ error: "A valid WebRTC offer is required" });
+    }
+
+    const instructions = `${AGROCARE_VOICE_INSTRUCTIONS}\n\nCurrent diagnosis context: ${JSON.stringify(diagnosis)}`;
+    const sessionConfig = {
+      type: "realtime",
+      model: OPENAI_REALTIME_MODEL,
+      instructions,
+      output_modalities: ["audio"],
+      max_output_tokens: 500,
+      audio: {
+        input: {
+          noise_reduction: { type: "near_field" },
+          turn_detection: {
+            type: "server_vad",
+            interrupt_response: true,
+            prefix_padding_ms: 300,
+            silence_duration_ms: 650,
+          },
+        },
+        output: { voice: "marin", format: { type: "audio/pcm" } },
+      },
+      tools: VOICE_TOOLS,
+      tool_choice: "auto",
+      tracing: null,
+    };
+
+    try {
+      const form = new FormData();
+      form.append("sdp", new Blob([sdp], { type: "application/sdp" }), "offer.sdp");
+      form.append("session", new Blob([JSON.stringify(sessionConfig)], { type: "application/json" }), "session.json");
+
+      const response = await fetch("https://api.openai.com/v1/realtime/calls", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}` },
+        body: form,
+      });
+
+      const answer = await response.text();
+      if (!response.ok) {
+        console.warn("OpenAI realtime session request failed", { status: response.status, userId: req.authUser?.uid });
+        return res.status(response.status >= 400 && response.status < 500 ? 502 : 503).json({
+          error: "OpenAI voice is temporarily unavailable. You can continue with Gemini voice.",
+        });
+      }
+
+      return res.type("application/sdp").send(answer);
+    } catch (error) {
+      console.error("OpenAI realtime session request failed", { userId: req.authUser?.uid, error: error instanceof Error ? error.name : "unknown" });
+      return res.status(503).json({ error: "OpenAI voice is temporarily unavailable. You can continue with Gemini voice." });
+    }
+  });
+
+  app.post("/api/voice/tool", requireFirebaseUser, async (req: AuthenticatedRequest, res) => {
+    const name = typeof req.body?.name === "string" ? req.body.name : "";
+    const args = req.body?.arguments && typeof req.body.arguments === "object" ? req.body.arguments as Record<string, unknown> : {};
+
+    try {
+      if (!name) return res.status(400).json({ error: "A voice tool name is required" });
+      const result = await runAgroCareAgent({
+        userId: req.authUser?.uid || "unknown-user",
+        toolName: name,
+        input: { ...args, diagnosis: req.body?.diagnosis },
+      }, {
+        supplierSearch: async (latitude, longitude) => {
+          try {
+            const response = await getGeminiClient().models.generateContent({
+              model: "gemini-3.5-flash",
+              contents: "Find agricultural input suppliers, seed stores, and fertilizer shops within 25km. Return only grounded place results.",
+              config: { tools: [{ googleMaps: {} }], toolConfig: { retrievalConfig: { latLng: { latitude, longitude } } } },
+            });
+            const suppliers = (response.candidates?.[0]?.groundingMetadata?.groundingChunks || [])
+              .map((chunk: any) => ({ name: chunk.maps?.title, address: chunk.maps?.uri || "" }))
+              .filter((supplier: { name?: string }) => supplier.name).slice(0, 3);
+            return { available: suppliers.length > 0, suppliers, source: "Google Maps grounding" };
+          } catch { return { available: false, suppliers: [], message: "Supplier search is unavailable right now." }; }
+        },
+      });
+      if (result.status === "fallback") return res.status(400).json({ error: "Unsupported or unavailable AgroCare tool", traceId: result.traceId });
+      return res.json(result);
+    } catch (error) {
+      console.error("Voice tool failed", { name, userId: req.authUser?.uid, error: error instanceof Error ? error.name : "unknown" });
+      return res.status(500).json({ error: "The requested AgroCare tool is temporarily unavailable" });
+    }
+  });
 
   // --- CONFIGURATION MANAGEMENT (Area 4) ---
   const AI_CONFIG = {
