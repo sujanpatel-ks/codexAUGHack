@@ -10,6 +10,7 @@ interface VoiceNavigationProps {
   currentLanguage: Language;
   onNavigate: (screen: Screen) => void;
   onCameraOpen: () => void;
+  enabled?: boolean;
 }
 
 // Commands translation dictionary for user guidance
@@ -55,7 +56,7 @@ const NAV_SOUNDS = {
   listening: 'https://assets.mixkit.co/active_storage/sfx/2019/2019-84.wav'
 };
 
-export const VoiceNavigation: React.FC<VoiceNavigationProps> = ({ currentLanguage, onNavigate, onCameraOpen }) => {
+export const VoiceNavigation: React.FC<VoiceNavigationProps> = ({ currentLanguage, onNavigate, onCameraOpen, enabled = true }) => {
   const { t } = useTranslation();
   const [isListening, setIsListening] = useState(false);
   const [showLiveChat, setShowLiveChat] = useState(false);
@@ -259,6 +260,8 @@ export const VoiceNavigation: React.FC<VoiceNavigationProps> = ({ currentLanguag
   };
 
   const isVoiceActive = isListening;
+
+  if (!enabled) return null;
 
   return (
     <>

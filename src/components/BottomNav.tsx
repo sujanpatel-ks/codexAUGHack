@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Search, Bell, History as HistoryIcon, Scan } from 'lucide-react';
+import { Home, Search, Bell, History as HistoryIcon, Scan, Store, UserRound, TrendingUp } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Screen, Language } from '../types';
 
@@ -15,19 +15,28 @@ const translations = {
     home: "Home",
     search: "Search",
     alerts: "Alerts",
-    history: "History"
+    history: "History",
+    markets: "Markets",
+    stores: "Stores",
+    profile: "Profile"
   },
   hi: {
     home: "मुख्य",
     search: "खोजें",
     alerts: "अलर्ट",
-    history: "इतिहास"
+    history: "इतिहास",
+    markets: "बाजार",
+    stores: "दुकानें",
+    profile: "प्रोफाइल"
   },
   kn: {
     home: "ಮನೆ",
     search: "ಹುಡುಕಾಟ",
     alerts: "ಎಚ್ಚರಿಕೆ",
-    history: "ಇತಿಹಾಸ"
+    history: "ಇತಿಹಾಸ",
+    markets: "ಮಾರುಕಟ್ಟೆ",
+    stores: "ಅಂಗಡಿಗಳು",
+    profile: "ಪ್ರೊಫೈಲ್"
   }
 };
 
@@ -42,8 +51,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   // Map active statuses to highlight correct tabs
   const isHomeActive = activeScreen === 'home';
   const isSearchActive = activeScreen === 'market' || activeScreen === 'crop-details' || activeScreen === 'suppliers';
+  const isStoreActive = activeScreen === 'suppliers';
   const isAlertsActive = activeScreen === 'calendar';
   const isHistoryActive = activeScreen === 'history';
+  const isProfileActive = activeScreen === 'profile';
 
   return (
     <>
@@ -81,14 +92,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               </span>
             </button>
 
-            {/* 2. SEARCH TAB */}
+            {/* 2. MARKETS TAB */}
             <button
               onClick={() => onScreenChange('market')}
               className={`flex flex-col items-center justify-center gap-1.5 h-14 rounded-2xl transition-all duration-200 ${
                 isSearchActive ? 'text-primary' : 'text-gray-400 hover:text-gray-600'
               }`}
               style={{ minHeight: '48px', minWidth: '48px' }}
-              aria-label="Search"
+              aria-label="Markets"
             >
               <div className="relative flex items-center justify-center p-1">
                 {isSearchActive && (
@@ -98,12 +109,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                     transition={{ type: "spring", stiffness: 380, damping: 30 }}
                   />
                 )}
-                <Search size={22} strokeWidth={isSearchActive ? 2.5 : 2} className="relative z-10" />
+                <TrendingUp size={22} strokeWidth={isSearchActive ? 2.5 : 2} className="relative z-10" />
               </div>
               <span className={`text-[10px] uppercase tracking-wider transition-all truncate max-w-full ${
                 isSearchActive ? 'font-black opacity-100' : 'font-bold opacity-60'
               }`}>
-                {t.search}
+                {t.markets}
               </span>
             </button>
 
@@ -123,55 +134,55 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               </div>
             </div>
 
-            {/* 4. ALERTS / CALENDAR TAB */}
+            {/* 4. STORES TAB */}
             <button
-              onClick={() => onScreenChange('calendar')}
+              onClick={() => onScreenChange('suppliers')}
               className={`flex flex-col items-center justify-center gap-1.5 h-14 rounded-2xl transition-all duration-200 ${
-                isAlertsActive ? 'text-primary' : 'text-gray-400 hover:text-gray-600'
+                isStoreActive ? 'text-primary' : 'text-gray-400 hover:text-gray-600'
               }`}
               style={{ minHeight: '48px', minWidth: '48px' }}
-              aria-label="Alerts"
+              aria-label="Stores"
             >
               <div className="relative flex items-center justify-center p-1">
-                {isAlertsActive && (
+                {isStoreActive && (
                   <motion.div 
                     layoutId="mobile-active-bg"
                     className="absolute inset-0 bg-primary/10 rounded-full scale-125"
                     transition={{ type: "spring", stiffness: 380, damping: 30 }}
                   />
                 )}
-                <Bell size={22} strokeWidth={isAlertsActive ? 2.5 : 2} className="relative z-10" />
+                <Store size={22} strokeWidth={isStoreActive ? 2.5 : 2} className="relative z-10" />
               </div>
               <span className={`text-[10px] uppercase tracking-wider transition-all truncate max-w-full ${
-                isAlertsActive ? 'font-black opacity-100' : 'font-bold opacity-60'
+                isStoreActive ? 'font-black opacity-100' : 'font-bold opacity-60'
               }`}>
-                {t.alerts}
+                {t.stores}
               </span>
             </button>
 
-            {/* 5. HISTORY TAB */}
+            {/* 5. PROFILE TAB */}
             <button
-              onClick={() => onScreenChange('history')}
+              onClick={() => onScreenChange('profile')}
               className={`flex flex-col items-center justify-center gap-1.5 h-14 rounded-2xl transition-all duration-200 ${
-                isHistoryActive ? 'text-primary' : 'text-gray-400 hover:text-gray-600'
+                isProfileActive ? 'text-primary' : 'text-gray-400 hover:text-gray-600'
               }`}
               style={{ minHeight: '48px', minWidth: '48px' }}
-              aria-label="History"
+              aria-label="Profile"
             >
               <div className="relative flex items-center justify-center p-1">
-                {isHistoryActive && (
+                {isProfileActive && (
                   <motion.div 
                     layoutId="mobile-active-bg"
                     className="absolute inset-0 bg-primary/10 rounded-full scale-125"
                     transition={{ type: "spring", stiffness: 380, damping: 30 }}
                   />
                 )}
-                <HistoryIcon size={22} strokeWidth={isHistoryActive ? 2.5 : 2} className="relative z-10" />
+                <UserRound size={22} strokeWidth={isProfileActive ? 2.5 : 2} className="relative z-10" />
               </div>
               <span className={`text-[10px] uppercase tracking-wider transition-all truncate max-w-full ${
-                isHistoryActive ? 'font-black opacity-100' : 'font-bold opacity-60'
+                isProfileActive ? 'font-black opacity-100' : 'font-bold opacity-60'
               }`}>
-                {t.history}
+                {t.profile}
               </span>
             </button>
 

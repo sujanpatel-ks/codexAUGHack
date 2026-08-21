@@ -415,7 +415,7 @@ export default function App() {
 
       {/* Global Language Selector Overlay on top of Home or Settings */}
       <AnimatePresence>
-        {(activeScreen === 'home' || activeScreen === 'profile') && (
+        {activeScreen === 'profile' && (
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -459,6 +459,7 @@ export default function App() {
         currentLanguage={language} 
         onNavigate={(screen) => setActiveScreen(screen)} 
         onCameraOpen={() => setShowCamera(true)}
+        enabled={activeScreen !== 'home'}
       />
       <Toaster position="top-center" richColors />
     </div>
